@@ -81,6 +81,7 @@ import Control.Exception
 import Control.Monad (unless, when)
 
 import Data.Char (isDigit)
+import Data.Monoid
 
 import Network.HaskellNet.Auth
 
@@ -208,10 +209,11 @@ sendCommand (SMTPC conn _) (AUTH LOGIN username password) =
     where command = BS.pack "AUTH LOGIN"
           (userB64, passB64) = login username password
 sendCommand (SMTPC conn _) (AUTH at username password) =
-    do bsPutCrLf conn command
-       (code, msg) <- parseResponse conn
-       unless (code == 334) $ fail "authentication failed."
-       bsPutCrLf conn $ BS.pack $ auth at (BS.unpack msg) username password
+    do case at of
+         XOAUTH2 -> bsPutCrLf conn . (command <>) $ BS.pack $ " " ++ auth at "" username password
+         _       -> do bsPutCrLf conn command
+                       (code, msg) <- parseResponse conn
+                       unless (code == 334) $ fail "authentication failed."
        parseResponse conn
     where command = BS.pack $ unwords ["AUTH", show at]
 sendCommand (SMTPC conn _) meth =
